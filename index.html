@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>MEA Honors Awards Spring 2020</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link rel="stylesheet" href="style.css">
+	</head>
+	<body>
+		<div id="students"></div>
+
+		<script type="text/javascript" src="js/csv-process.js"></script>
+		<script type="module">
+
+			const DEBUG = false;
+
+			const majors = {
+				"ANI-AS": "Animation & Motion Graphics", 
+				"MMD-AS": "Multimedia Programming & Design", 
+				"VAT-AS": "Video Arts & Technology"
+			};
+
+			async function fetchStudents() {
+				let ani = await ( await(fetch('./data/ani.csv')) ).text();
+				let mmd = await ( await(fetch('./data/mmd.csv')) ).text();
+				let vat = await ( await(fetch('./data/vat.csv')) ).text();
+				return [ani, mmd, vat];
+			}
+
+			fetchStudents().then(data => { populateStudents(data); });
+
+			const studentsDiv = document.getElementById('students');
+			function populateStudents(data) {
+				
+				for (let i = 0; i < data.length; i++) {
+					const majorDiv = document.createElement('div');
+					majorDiv.classList.add('major');
+					const majorTitle = document.createElement('h1');
+					const students = CSVToArray(data[i]);
+					const majorName = majors[students[1][2]];
+					majorTitle.textContent = majorName;
+
+					studentsDiv.appendChild(majorTitle);
+					studentsDiv.appendChild(majorDiv);
+
+					for (let j = 1; j < students.length; j++) {
+						const name = `${students[j][1]} ${students[j][0]}`;
+						const c = document.createElement('div');
+						const a = document.createElement('a');
+						a.textContent = name;
+						a.href = '#';
+						a.onclick = function() {
+							// createAward(name, majorName);
+							localStorage.setItem('name', name);
+							localStorage.setItem('major', majorName);
+							window.open('single.html', '_self');
+						};
+
+
+						const d = document.createElement('a');
+						d.classList.add('download');
+						d.textContent = "Download";
+						d.href = `./v/${students[j][1]}-${students[j][0]}.mp4`;
+						d.download = `${students[j][1]}-${students[j][0]}.mp4`;
+
+						c.appendChild(a);
+						const s = document.createElement('span');
+						s.textContent = " ";
+						c.appendChild(s);
+						c.appendChild(d);
+						majorDiv.appendChild(c);
+					}
+				}
+			}
+		</script>
+
+	</body>
+</html>

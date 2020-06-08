@@ -1,0 +1,7 @@
+.DS_Store
+test/
+originals/
+Icon*
+*.blend*
+hubs-tut.mp4
+*.xlsx

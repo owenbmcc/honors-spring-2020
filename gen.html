@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>MEA Honors Spring 2020</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+		<script type="text/javascript" src="js/csv-process.js"></script>
+		<script type="text/javascript" src="js/gif.js"></script>
+		<script src="js/CCapture.all.min.js"></script>
+
+		<script type="module">
+
+			// https://github.com/spite/ccapture.js/
+			// hell yeah
+			// png quality better ...
+			// const capturer = new CCapture( { format: 'png' } );
+			// https://janakiev.com/blog/videos-and-gifs-with-threejs/
+			const DEBUG = false;
+			const capturer = new CCapture( { 
+				name: 'test', 
+				format: 'webm'
+			} );
+
+			const colors = {
+				blue: 0x0054B8,
+				lightblue: 0xBADAFF,
+				darkblue: 0x006699,
+				orange: 0xFFAD8E,
+			};
+
+			const majors = {
+				"ANI-AS": "Animation & Motion Graphics", 
+				"MMD-AS": "Multimedia Programming & Design", 
+				"VAT-AS": "Video Arts & Technology"
+			};
+
+			let numStudents, titles, fileName;
+			let index = localStorage.getItem('index') || 1;
+
+			// load csv data
+			fetch('./data/vat.csv')
+				.then(response => { return response.text(); } )
+				.then(data => {
+					const students = CSVToArray(data);
+					numStudents = students.length - 1;
+					fileName = `${students[index][1]}-${students[index][0]}`;
+					// fileName = "Student-Name";
+					text = `${students[index][1]} ${students[index][0]}`;
+					titles = [
+						"Borough of Manhattan",
+						"Community College",
+						"Department of",
+						"Media Arts & Technology",
+						"",
+						"",
+						"is hereby recognized",
+						"by the faculty of the Department",
+						"for academic excellence in",
+						majors[students[index][2]],
+						"Awarded on this",
+						"10th day of June 2020",
+						// "Chairperson",
+					];
+
+					init();
+				});
+
+			const loading = {};
+			let doneLoading = false;
+
+			import * as THREE from './js/three.module.js';
+			import { TTFLoader } from './js/TTFLoader.js';
+			import { OrbitControls } from './js/OrbitControls.js';
+
+			import { OBJLoader } from './three/jsm/loaders/OBJLoader.js';
+			import { EffectComposer } from './three/jsm/postprocessing/EffectComposer.js';
+			import { RenderPass } from './three/jsm/postprocessing/RenderPass.js';
+			import { ShaderPass } from './three/jsm/postprocessing/ShaderPass.js';
+			import { UnrealBloomPass } from './three/jsm/postprocessing/UnrealBloomPass.js';
+			import { HalftonePass } from './three/jsm/postprocessing/HalftonePass.js';
+			import { Water } from './three/jsm/objects/Water.js';
+
+			THREE.Cache.enabled = true;
+
+			let container, permalink, hex, controls;
+			let camera, cameraTarget, scene, renderer;
+			let group, textMesh1, textMesh2, textGeo, materials;
+
+
+			let w = 1920, h = 1080;
+
+			let text = "Student Name",
+				height = 20,
+				size = 30,
+				hover = 10,
+
+				curveSegments = 4,
+
+				bevelThickness = 2,
+				bevelSize = 1.5,
+				bevelEnabled = true,
+
+				andalemo = undefined,
+				gotisch = undefined,
+				mirror = false;
+
+			var startRecording = false;
+
+			// camera animation
+			const r = 0.1;
+			const radius = 1000, 
+				camPosition = { x: 0, y: 500, z: 750 },
+				theta = { x: 0, y: 0, z: 0 }, 
+				speed = { 
+					x: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1), 
+					y: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1), 
+					z: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1)
+				};
+			var frameCount = 0, animationLength = 30;
+
+			// logos
+			let bmcc, logo;
+
+			// effects
+			var composer, parent, bmccMesh, logoMesh, nameMesh;
+			var clock = new THREE.Clock();
+
+			let water;
+			let halftonePass;
+			let buildings;
+
+			// init();
+			// animate();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+
+				permalink = document.getElementById( "permalink" );
+
+				// CAMERA
+				camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 1750 );
+				camera.position.set( camPosition.x, camPosition.y, camPosition.z );
+				cameraTarget = new THREE.Vector3( 0, 50, 0 );
+
+				// SCENE
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( colors.lightblue );
+				scene.fog = new THREE.Fog( colors.orange, 750, 1700 );
+
+				// LIGHTS
+				var light = new THREE.AmbientLight(0xffffff, 0.5);
+				scene.add( light );
+
+				var light1 = new THREE.PointLight( 0xffffff, 2.75 );
+				light1.position.set( 100, 200, 200 );
+				scene.add( light1 );
+
+				var light2 = new THREE.PointLight( 0xffffff, 2.75 );
+				light2.position.set( -100, 200, -200 );
+				scene.add( light2 );
+
+
+				materials = [
+					new THREE.MeshNormalMaterial( {
+						normalScale: new THREE.Vector2( 1, - 1 ),
+						// flatShading: true,
+						side: THREE.DoubleSide
+					} ),
+					new THREE.MeshNormalMaterial( {
+						normalScale: new THREE.Vector2( 1, - 1 ),
+						//flatShading: true,
+						side: THREE.DoubleSide
+					} ),
+					new THREE.MeshPhongMaterial( { color: 0xffffff, flatShading: true } ), // front
+					new THREE.MeshPhongMaterial( { color: 0xffffff } ) // side
+				];
+
+				group = new THREE.Group();
+				group.position.y = 100;
+				// group.rotation.y = Math.PI * -0.25;
+
+				scene.add( group );
+
+				// student name text
+				var loader = new TTFLoader();
+				loading.analemo = false;
+				loader.load( 'data/andalemo.ttf', function ( json ) {
+					andalemo = new THREE.Font( json );
+					createText( andalemo );
+					loading.analemo = true;
+				});
+
+				// certificate text
+				// var floader = new TTFLoader();
+				// font fix https://stackoverflow.com/questions/49246492/three-js-new-three-textbuffergeometry-cannot-read-property-ymax-of-undefined
+				var floader = new THREE.FontLoader();
+				loading.gotisch = false;
+				floader.load( 'data/Deutsch-Gotisch.json', function ( font ) {
+					// gotisch = new THREE.Font( json );
+
+					let color = 0x006699;
+
+					var matLite = new THREE.MeshPhongMaterial( {
+						color: color,
+						transparent: true,
+						opacity: 0.9,
+						side: THREE.DoubleSide
+					} );
+
+					let z = 350;
+					for (let i = 0; i < titles.length; i++) {
+						let xMid, text;
+						const message = titles[i];
+						let shapes = font.generateShapes( message, 30 );
+						let textShape = new THREE.BufferGeometry();
+						let geometry = new THREE.ShapeGeometry( shapes );
+						
+						geometry.computeBoundingBox();
+						xMid = - 0.5 * ( geometry.boundingBox.max.x - geometry.boundingBox.min.x );
+						geometry.translate( xMid, 0, 0 );
+
+						textShape.fromGeometry( geometry );
+						text = new THREE.Mesh( textShape, matLite );
+
+						text.position.y = 110;
+						text.rotation.x = Math.PI * -0.5;
+						text.position.z = 150 - z;
+						scene.add( text );
+						z -= 50;
+					}
+
+					// start recording
+					// startRecording = true;
+					loading.gotisch = true;
+				});
+
+				var plane = new THREE.Mesh(
+					new THREE.PlaneBufferGeometry( 1000000, 1000000 ),
+					new THREE.MeshPhongMaterial( { color: colors.blue, opacity: 0.75, transparent: true } )
+				);
+				plane.position.y = 100;
+				plane.rotation.x = - Math.PI / 2;
+				plane.receiveShadow = true; //default
+				// scene.add( plane );
+
+				const logoMat = new THREE.MeshStandardMaterial({
+					color: colors.blue,
+					emissive: colors.blue,
+					emissiveIntensity: 0.25,
+					roughness: 0.25,
+					metalness: 0.75,
+				});
+
+  				var oloader = new OBJLoader();
+  				loading.logo = false;
+				oloader.load( './data/logo.obj', function ( object ) {
+
+					logo = object;
+					let s = 3;
+					logo.scale.set( s, s, s );
+					logo.position.set( 250, 100, 0 );
+					logo.children[0].material = logoMat;
+					scene.add( logo );
+
+					var positions = combineBuffer( logo, 'position' );
+					logoMesh = createMesh( positions, scene, s, 250, 100, 0, colors.orange );
+					loading.logo = true;
+				} );
+
+				loading.bmcc = false;
+  				oloader.load( './data/bmcc.obj', object => {
+  					// console.log( gltf );
+  					bmcc = object;
+
+  					let s = 3;
+  					bmcc.scale.set( s, s, s );
+  					bmcc.position.set( -250, 100, 0 );
+  					bmcc.children[0].material = logoMat;
+  					scene.add( bmcc );
+
+  					var positions = combineBuffer( bmcc, 'position' );
+					bmccMesh = createMesh( positions, scene, s, -250, 100, 0, colors.orange );
+					loading.bmcc = true;
+  				});
+
+
+  				var waterGeometry = new THREE.PlaneBufferGeometry( 10000, 10000 );
+				water = new Water(
+					waterGeometry,
+					{
+						textureWidth: 512,
+						textureHeight: 512,
+						waterNormals: new THREE.TextureLoader().load( 'textures/waternormals.jpg', function ( texture ) {
+							texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+						} ),
+						alpha: 1.0,
+						sunDirection: light.position.clone().normalize(),
+						sunColor: 0xffffff,
+						waterColor: colors.darkblue,
+						distortionScale: 3.7,
+						fog: scene.fog !== undefined
+					}
+				);
+				water.position.y = 100;
+				water.rotation.x = - Math.PI / 2;
+				scene.add( water );
+
+  				// parent for effects
+				parent = new THREE.Object3D();
+				scene.add( parent );
+
+				buildings = new THREE.Group();
+				scene.add( buildings );
+				buildBuildings();
+
+				billboards();
+
+				// RENDERER
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				// renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setSize( w, h );
+
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+				container.appendChild( renderer.domElement );
+
+
+				let renderPass = new RenderPass( scene, camera );
+				let bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+				composer = new EffectComposer( renderer );
+				bloomPass.threshold = 0.75;
+				bloomPass.strength = 0.5;
+				bloomPass.radius = 0.5;
+				bloomPass.renderToScreen = true;
+
+				let halftoneParams = {
+					shape: 1,
+					radius: 3,
+					rotateR: Math.PI / 12,
+					rotateB: Math.PI / 12 * 2,
+					rotateG: Math.PI / 12 * 4,
+					scatter: 0,
+					blending: 1,
+					blendingMode: 5,
+					greyscale: false,
+					disable: false
+				};
+				halftonePass = new HalftonePass( window.innerWidth, window.innerHeight, halftoneParams );
+
+				composer.addPass( renderPass );
+				composer.addPass( bloomPass );
+				composer.addPass( halftonePass );
+				// composer.addPass( effectFilm );
+
+
+				controls = new OrbitControls( camera, renderer.domElement );
+
+				animate();
+			}
+
+
+			function billboards() {
+				let geometry = new THREE.BufferGeometry();
+				let vertices = [];
+				let sprite = new THREE.TextureLoader().load( 'textures/sprites/disc.png' );
+				let n = 1000;
+				for ( let i = 0; i < 1000; i ++ ) {
+					let x = n * Math.random() - n/2;
+					let y = n * Math.random() - n/2;
+					let z = n * Math.random() - n/2;
+					vertices.push( x, y, z );
+				}
+
+
+				geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
+				let material = new THREE.PointsMaterial( { size: 16, sizeAttenuation: false, map: sprite, alphaTest: 0.25, transparent: true, opacity: 0.25, color: colors.lightblue} );
+				// material.color.setHSL( 1.0, 0.3, 0.7 );
+
+				var particles = new THREE.Points( geometry, material );
+				scene.add( particles );
+			}
+
+			function buildBuildings() {
+
+				for (var i = buildings.children.length - 1; i >= 0; i--) {
+ 				   buildings.remove(buildings.children[i]);
+				}
+
+				let _x = 2000;
+				let _z = 300;
+				let _space = 50;
+				for (let x = -_x/2; x < _x/2; x += _space) {
+					for (let z = -_z/2; z < _z/2; z += _space * 1.5) {
+						const y = Math.random() * 500 + 50;
+						const geo = new THREE.BoxBufferGeometry( _space, y, _space );
+						const mat = new THREE.MeshBasicMaterial({ color: colors.darkblue });
+						const building = new THREE.Mesh( geo, mat );
+						building.position.set( x, 100, z - 450 );
+						buildings.add( building );
+
+					}
+				}
+			}
+
+			// add ponts for effects 
+			function combineBuffer( model, bufferName ) {
+
+				let count = 0;
+				model.traverse( function ( child ) {
+					if ( child.isMesh ) {
+						var buffer = child.geometry.attributes[ bufferName ];
+						count += buffer.array.length;
+					}
+				} );
+
+				var combined = new Float32Array( count );
+				let offset = 0;
+				model.traverse( function ( child ) {
+					if ( child.isMesh ) {
+						var buffer = child.geometry.attributes[ bufferName ];
+						combined.set( buffer.array, offset );
+						offset += buffer.array.length;
+					}
+				} );
+				return new THREE.BufferAttribute( combined, 3 );
+			}
+
+			// effects meshes 
+			function createMesh( positions, scene, scale, x, y, z, color ) {
+
+				var geometry = new THREE.BufferGeometry();
+				geometry.setAttribute( 'position', positions.clone() );
+				geometry.setAttribute( 'initialPosition', positions.clone() );
+
+				let mesh = new THREE.Points( geometry, new THREE.PointsMaterial( { size: 5, color: color } ) );
+				mesh.scale.x = mesh.scale.y = mesh.scale.z = scale;
+
+				mesh.position.x = x;
+				mesh.position.y = y;
+				mesh.position.z = z;
+
+				parent.add( mesh );
+
+				return {
+					mesh: mesh, 
+					verticesDown: 0, 
+					verticesUp: 0, 
+					direction: 0, 
+					speed: 2, 
+					bottom: 0,
+					delay: Math.floor( 200 + 200 * Math.random() ),
+					start: 5 // Math.floor( 10 + 20 * Math.random() ),
+				};
+			}
+
+			function createText(font) {
+
+				textGeo = new THREE.TextGeometry( text, {
+					font: font,
+					size: size,
+					height: height,
+					curveSegments: curveSegments,
+					bevelThickness: bevelThickness,
+					bevelSize: bevelSize,
+					bevelEnabled: bevelEnabled
+				} );
+
+				textGeo.castShadow = true;
+
+				textGeo.computeBoundingBox();
+				textGeo.computeVertexNormals();
+
+				var triangle = new THREE.Triangle();
+
+				// "fix" side normals by removing z-component of normals for side faces
+				// (this doesn't work well for beveled geometry as then we lose nice curvature around z-axis)
+
+				if ( ! bevelEnabled ) {
+					var triangleAreaHeuristics = 0.1 * ( height * size );
+					for ( var i = 0; i < textGeo.faces.length; i ++ ) {
+						var face = textGeo.faces[ i ];
+						if ( face.materialIndex == 1 ) {
+							for ( var j = 0; j < face.vertexNormals.length; j ++ ) {
+								face.vertexNormals[ j ].z = 0;
+								face.vertexNormals[ j ].normalize();
+							}
+							var va = textGeo.vertices[ face.a ];
+							var vb = textGeo.vertices[ face.b ];
+							var vc = textGeo.vertices[ face.c ];
+							var s = triangle.set( va, vb, vc ).getArea();
+							if ( s > triangleAreaHeuristics ) {
+								for ( var j = 0; j < face.vertexNormals.length; j ++ ) {
+									face.vertexNormals[ j ].copy( face.normal );
+								}
+							}
+						}
+					}
+				}
+
+				var centerOffset = - 0.5 * ( textGeo.boundingBox.max.x - textGeo.boundingBox.min.x );
+
+				textGeo = new THREE.BufferGeometry().fromGeometry( textGeo );
+
+				textMesh1 = new THREE.Mesh( textGeo, materials );
+
+				textMesh1.position.x = centerOffset;
+				textMesh1.position.y = hover;
+				textMesh1.position.z = 0;
+
+				let positions = combineBuffer( textMesh1, 'position' );
+				nameMesh = createMesh( positions, scene, 1, centerOffset, 100 + hover, 0, colors.orange );
+				nameMesh.bottom = -10;
+
+				group.add( textMesh1 );
+			}
+
+			function animateEffects( mesh, delta ) {
+
+				var data = mesh;
+				var positions = data.mesh.geometry.attributes.position;
+				var initialPositions = data.mesh.geometry.attributes.initialPosition;
+				var count = positions.count;
+				if ( data.start > 0 ) {
+					data.start -= 1;
+				} else {
+					if ( data.direction === 0 ) {
+						data.direction = - 1;
+					}
+				}
+
+				for ( var i = 0; i < count; i ++ ) {
+					var px = positions.getX( i );
+					var py = positions.getY( i );
+					var pz = positions.getZ( i );
+					// falling down
+					if ( data.direction < 0 ) {
+						if ( py > data.bottom ) {
+							positions.setXYZ(
+								i,
+								px + 3.0 * ( 0.50 - Math.random() ) * data.speed * delta,
+								py + 3.0 * ( 0.25 - Math.random() ) * data.speed * delta,
+								pz + 3.0 * ( 0.50 - Math.random() ) * data.speed * delta
+							);
+						} else {
+							data.verticesDown += 1;
+						}
+					}
+				}
+
+				
+				positions.needsUpdate = true;
+			}
+
+			function animate() {
+				if (!startRecording) requestAnimationFrame( animate );
+				// console.log('animate')
+				render();
+			}
+
+
+			function render() {
+				// console.log('render?', startRecording)
+
+				var a = Object.keys(loading);
+				if (!doneLoading && a.filter(k => { return loading[k]; }).length == a.length) {
+					doneLoading = true;
+					startRecording = true;
+				}
+
+				if (doneLoading) {
+
+					if (logo) logo.rotation.y -= 0.0125;
+					if (bmcc) bmcc.rotation.y += 0.0125;
+
+					// halftonePass.uniforms.scatter.value += 0.001;
+					// halftonePass.uniforms.radius.value += 0.001;
+
+					var delta = 35 * clock.getDelta();
+					delta = delta < 2 ? delta : 2;
+
+					if (logoMesh) animateEffects( logoMesh, delta );
+					if (bmccMesh) animateEffects( bmccMesh, delta );
+					if (nameMesh) animateEffects( nameMesh, delta );
+
+					water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
+
+				}
+
+				if (startRecording && doneLoading) {
+
+					if (frameCount == 0 && !DEBUG) capturer.start();
+
+					theta.x += speed.x;
+					theta.y += speed.y;
+					theta.z += speed.z;
+
+					camera.position.x = radius * Math.sin( THREE.MathUtils.degToRad( theta.x ) );
+					camera.position.y = 600 + radius * Math.sin( THREE.MathUtils.degToRad( theta.y ) );
+					camera.position.z = radius * Math.cos( THREE.MathUtils.degToRad( theta.z ) );
+					camera.updateMatrixWorld();
+					camera.lookAt( cameraTarget );
+
+					
+					if (frameCount == animationLength) {
+						speed.x *= -1;
+						speed.y *= -1;
+						speed.z *= -1;
+
+					}
+
+					if (frameCount == animationLength * 2) {
+						startRecording = false;
+						if (!DEBUG) {
+							capturer.stop();
+							capturer.save(blob => {
+								console.log( capturer );
+								// var d = download( blob, `${fileName}.gif`, 'image/gif' );
+								var d = download( blob, `${fileName}.webm`, 'video/webm' );
+								setTimeout(() => {
+									if (index <  numStudents) {
+										index++;
+										localStorage.setItem('index', index);
+										location.reload();
+									} else {
+										console.log('done!')
+									}
+								}, 1000);
+							});
+						}
+					}
+				}
+
+				renderer.clear();
+				// renderer.render( scene, camera );
+				composer.render();
+
+				if (startRecording) {
+					if (!DEBUG) capturer.capture( renderer.domElement );
+					frameCount += 1;
+					requestAnimationFrame( animate );
+				}
+
+			}
+
+		</script>
+
+	</body>
+</html>
