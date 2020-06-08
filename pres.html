@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>MEA Honors Awards Spring 2020</title>
+		<title>MEA Honors Spring 2020</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<link rel="stylesheet" href="pres.css">
 	</head>
 	<body>
 		<div id="award"></div>
-		<div id="students"></div>
 
 		<script type="text/javascript" src="js/csv-process.js"></script>
+
 		<script type="module">
 
-			const DEBUG = true;
+			const maj = location.hash.split('#')[1];
 
 			const colors = {
 				blue: 0x0054B8,
@@ -21,7 +21,46 @@
 				darkblue: 0x006699,
 				orange: 0xFFAD8E,
 			};
- 
+
+			const majors = {
+				"ANI-AS": "Animation & Motion Graphics", 
+				"MMD-AS": "Multimedia Programming & Design", 
+				"VAT-AS": "Video Arts & Technology"
+			};
+
+			let numStudents, titles, students;
+			let index = 1;
+
+			// load csv data
+			fetch(`./data/${maj}.csv`)
+				.then(response => { return response.text(); } )
+				.then(data => {
+					students = CSVToArray(data);
+					numStudents = students.length - 1;
+					setText();
+					init();
+					animate();
+				});
+
+			function setText() {
+				text = `${students[index][1]} ${students[index][0]}`;
+				titles = [
+					"Borough of Manhattan",
+					"Community College",
+					"Department of",
+					"Media Arts & Technology",
+					"",
+					"",
+					"is hereby recognized",
+					"by the faculty of the Department",
+					"for academic excellence in",
+					majors[students[index][2]],
+					"Awarded on this",
+					"10th day of June 2020",
+					// "Chairperson",
+				];
+			}
+
 			const loading = {};
 			let doneLoading = false;
 
@@ -42,9 +81,7 @@
 			let container = document.getElementById( 'award' );
 			let permalink, hex, controls;
 			let camera, cameraTarget, scene, renderer;
-			let group, textMesh1, textMesh2, textGeo, materials;
-
-			let w = 1920, h = 1080;
+			let textGroup, textMesh1, textMesh2, textGeo, textMaterials;
 
 			let text = "Student Name",
 				height = 20,
@@ -64,8 +101,8 @@
 			var startAnimation = false;
 
 			// camera animation
-			const r = 0.15;
-			const radius = 1000, 
+			const r = 0.125;
+			let radius = 1000, 
 				camPosition = { x: 0, y: 500, z: 750 },
 				theta = { x: 0, y: 0, z: 0 }, 
 				speed = { 
@@ -73,49 +110,21 @@
 					y: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1), 
 					z: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1)
 				};
-			var frameCount = 0, animationLength = 120, particleSpeed = 20;
+			var frameCount = 0, animationLength = 30, particleSpeed = 25;
 
 			// logos
 			let bmcc, logo;
 
 			// effects
-			var composer, parent, bmccMesh, logoMesh, nameMesh;
+			var composer, bmccMesh, logoMesh, nameMesh;
 			var clock = new THREE.Clock();
 
 			let water;
 			let halftonePass;
-			let buildings;
+			let billboards, buildings, particles;
 
 			// init();
 			// animate();
-
-			const studentName = localStorage.getItem('name');
-			const majorName = localStorage.getItem('major');
-			let titles;
-
-			if (studentName && majorName) {
-				text = studentName;
-				titles = [
-					"Borough of Manhattan",
-					"Community College",
-					"Department of",
-					"Media Arts & Technology",
-					"",
-					"",
-					"is hereby recognized",
-					"by the faculty of the Department",
-					"for academic excellence in",
-					majorName,
-					"Awarded on this",
-					"11th day of June 2020",
-					// "Chairperson",
-				];
-				init();
-			} else {
-				container.textContent = "Student not found";
-			}
-
-			
 
 			function init() {
 
@@ -143,8 +152,7 @@
 				light2.position.set( -100, 200, -200 );
 				scene.add( light2 );
 
-
-				materials = [
+				textMaterials = [
 					new THREE.MeshNormalMaterial( {
 						normalScale: new THREE.Vector2( 1, - 1 ),
 						// flatShading: true,
@@ -154,16 +162,13 @@
 						normalScale: new THREE.Vector2( 1, - 1 ),
 						//flatShading: true,
 						side: THREE.DoubleSide
-					} ),
-					new THREE.MeshPhongMaterial( { color: 0xffffff, flatShading: true } ), // front
-					new THREE.MeshPhongMaterial( { color: 0xffffff } ) // side
+					} )
 				];
 
-				group = new THREE.Group();
-				group.position.y = 100;
-				// group.rotation.y = Math.PI * -0.25;
+				textGroup = new THREE.Group();
+				textGroup.position.y = 100;
 
-				scene.add( group );
+				scene.add( textGroup );
 
 				// student name text
 				var loader = new TTFLoader();
@@ -181,6 +186,7 @@
 				loading.gotisch = false;
 				floader.load( 'data/Deutsch-Gotisch.json', function ( font ) {
 					// gotisch = new THREE.Font( json );
+					gotisch = font;
 
 					let color = 0x006699;
 
@@ -218,14 +224,6 @@
 					loading.gotisch = true;
 				});
 
-				var plane = new THREE.Mesh(
-					new THREE.PlaneBufferGeometry( 1000000, 1000000 ),
-					new THREE.MeshPhongMaterial( { color: colors.blue, opacity: 0.75, transparent: true } )
-				);
-				plane.position.y = 100;
-				plane.rotation.x = - Math.PI / 2;
-				plane.receiveShadow = true; //default
-				// scene.add( plane );
 
 				const logoMat = new THREE.MeshStandardMaterial({
 					color: colors.blue,
@@ -246,8 +244,9 @@
 					logo.children[0].material = logoMat;
 					scene.add( logo );
 
-					var positions = combineBuffer( logo, 'position' );
-					logoMesh = createMesh( positions, scene, s, 250, 100, 0, colors.orange );
+					// var positions = combineBuffer( logo, 'position' );
+					// logoMesh = createMesh( positions, scene, s, 250, 100, 0, colors.orange );
+					logoMesh = logoParticles( logo, 250 );
 					loading.logo = true;
 				} );
 
@@ -262,8 +261,7 @@
   					bmcc.children[0].material = logoMat;
   					scene.add( bmcc );
 
-  					var positions = combineBuffer( bmcc, 'position' );
-					bmccMesh = createMesh( positions, scene, s, -250, 100, 0, colors.orange );
+					bmccMesh = logoParticles( bmcc, -250 );
 					loading.bmcc = true;
   				});
 
@@ -290,21 +288,22 @@
 				scene.add( water );
 
   				// parent for effects
-				parent = new THREE.Object3D();
-				scene.add( parent );
+				particles = new THREE.Object3D();
+				scene.add( particles );
 
 				buildings = new THREE.Group();
 				scene.add( buildings );
-
 				buildBuildings();
-				billboards();
 
+				billboards = new THREE.Group();
+				scene.add( billboards );
+				buildBillboards();
+			
 				// RENDERER
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				// renderer.setSize( window.innerWidth, window.innerHeight );
-				// renderer.setSize( w, h );
 				renderer.setSize( container.clientWidth, container.clientHeight );
 
 				renderer.shadowMap.enabled = true;
@@ -339,14 +338,54 @@
 				composer.addPass( halftonePass );
 				// composer.addPass( effectFilm );
 
-
 				controls = new OrbitControls( camera, renderer.domElement );
-
-				animate();
+				// animate();
 			}
 
+			function reset() {
 
-			function billboards() {
+				// remote old particles
+				for (var i = particles.children.length - 1; i >= 0; i--) {
+    				particles.remove( particles.children[i] );
+				}
+				bmccMesh = logoParticles( bmcc, -250 );
+				bmcc.rotation.y = 0;
+
+				logoMesh = logoParticles( logo, 250 );
+				logo.rotation.y = 0;
+
+				speed = { 
+					x: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1), 
+					y: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1), 
+					z: (Math.random() * r + r) * (Math.random() > 0.5 ? -1 : 1)
+				};
+
+
+
+				for (var i = buildings.children.length - 1; i >= 0; i--) {
+    				buildings.remove( buildings.children[i] );
+				}
+				buildBuildings();
+
+				for (var i = billboards.children.length - 1; i >= 0; i--) {
+    				billboards.remove( billboards.children[i] );
+				}
+				buildBillboards();
+
+				for (var i = textGroup.children.length - 1; i >= 0; i--) {
+    				textGroup.remove( textGroup.children[i] );
+				}
+				createText( andalemo );
+
+				// reset logo rotations?
+			}
+
+			function logoParticles( obj, x ) {
+				var positions = combineBuffer( obj, 'position' );
+				return createMesh( positions, scene, 3, x, 100, 0, colors.orange );
+			}
+
+			function buildBillboards() {
 				let geometry = new THREE.BufferGeometry();
 				let vertices = [];
 				let sprite = new THREE.TextureLoader().load( 'textures/sprites/disc.png' );
@@ -358,13 +397,12 @@
 					vertices.push( x, y, z );
 				}
 
-
 				geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
 				let material = new THREE.PointsMaterial( { size: 16, sizeAttenuation: false, map: sprite, alphaTest: 0.25, transparent: true, opacity: 0.25, color: colors.lightblue} );
 				// material.color.setHSL( 1.0, 0.3, 0.7 );
 
-				var particles = new THREE.Points( geometry, material );
-				scene.add( particles );
+				var parts = new THREE.Points( geometry, material );
+				billboards.add( parts );
 			}
 
 			function buildBuildings() {
@@ -426,7 +464,7 @@
 				mesh.position.y = y;
 				mesh.position.z = z;
 
-				parent.add( mesh );
+				particles.add( mesh );
 
 				return {
 					mesh: mesh, 
@@ -440,7 +478,7 @@
 				};
 			}
 
-			function createText(font) {
+			function createText( font ) {
 
 				textGeo = new THREE.TextGeometry( text, {
 					font: font,
@@ -488,7 +526,7 @@
 
 				textGeo = new THREE.BufferGeometry().fromGeometry( textGeo );
 
-				textMesh1 = new THREE.Mesh( textGeo, materials );
+				textMesh1 = new THREE.Mesh( textGeo, textMaterials );
 
 				textMesh1.position.x = centerOffset;
 				textMesh1.position.y = hover;
@@ -498,7 +536,7 @@
 				nameMesh = createMesh( positions, scene, 1, centerOffset, 100 + hover, 0, colors.orange );
 				nameMesh.bottom = -10;
 
-				group.add( textMesh1 );
+				textGroup.add( textMesh1 );
 			}
 
 			function animateEffects( mesh, delta ) {
@@ -543,13 +581,15 @@
 				render();
 			}
 
-			function render() {
-				// console.log('render?', startRecording)
 
-				var a = Object.keys(loading);
-				if (!doneLoading && a.filter(k => { return loading[k]; }).length == a.length) {
-					doneLoading = true;
-					startAnimation = true;
+			function render() {
+				
+				if (!doneLoading) {
+					var a = Object.keys(loading);
+					if (a.filter(k => { return loading[k]; }).length == a.length) {
+						doneLoading = true;
+						startAnimation = true;
+					}
 				}
 
 				if (doneLoading) {
@@ -560,7 +600,7 @@
 					// halftonePass.uniforms.scatter.value += 0.001;
 					// halftonePass.uniforms.radius.value += 0.001;
 
-					var delta = particleSpeed * clock.getDelta();
+					var delta = 35 * clock.getDelta();
 					delta = delta < 2 ? delta : 2;
 
 					if (logoMesh) animateEffects( logoMesh, delta );
@@ -582,12 +622,12 @@
 					camera.position.z = radius * Math.cos( THREE.MathUtils.degToRad( theta.z ) );
 					camera.updateMatrixWorld();
 					camera.lookAt( cameraTarget );
+
 					
 					if (frameCount == animationLength) {
 						speed.x *= -1;
 						speed.y *= -1;
 						speed.z *= -1;
-
 					}
 
 					if (frameCount == animationLength * 2) {
@@ -601,7 +641,26 @@
 					composer.render();
 				}
 
+				if (doneLoading) {
+					renderer.clear();
+					composer.render();
+				}
 			}
+
+			/* slideshow events */
+			document.addEventListener('keydown', ev => {
+				if (ev.code == 'ArrowRight' || ev.code == 'Enter') {
+					if (index <  numStudents) {
+						index++;
+						setText();
+						reset();
+						startAnimation = true;
+						frameCount = 0;
+					} else {
+						console.log('done!')
+					}
+				}
+			});
 
 		</script>
 
