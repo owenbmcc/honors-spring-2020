@@ -7,6 +7,24 @@
 		<link rel="stylesheet" href="style.css">
 	</head>
 	<body>
+		
+		<div id="mvrp">
+			<h1>Michael Vincent Rosen-Pipitone Rising Star Award</h1>
+			<div class="major">
+				<div>
+					<a href="#" onclick="setMVRPLink('Jorge Aguilar')">Jorge Aguilar</a> <a href="./mvrp/Jorge-Aguilar.mp4" class="download" download="Jorge-Aguilar.mp4">Download</a>
+				</div>
+				<div>
+					<a href="#" onclick="setMVRPLink('Hallan Batman')">Hallan Batman</a> <a href="./mvrp/Hallan-Batman.mp4" class="download" download="Hallan-Batman.mp4">Download</a>
+				</div>
+				<div>
+					<a href="#" onclick="setMVRPLink('Squire Lysander')">Squire Lysander</a> <a href="./mvrp/Squire-Lysander.mp4" class="download" download="Squire-Lysander.mp4">Download</a>
+				</div>
+				<div>
+					<a href="#" onclick="setMVRPLink('Ashley Velez')">Ashley Velez</a> <a href="./mvrp/Ashley-Velez.mp4" class="download" download="Ashley-Velez.mp4">Download</a>
+				</div>
+			</div>
+		</div>
 		<div id="students"></div>
 
 		<script type="text/javascript" src="js/csv-process.js"></script>
@@ -28,6 +46,11 @@
 			}
 
 			fetchStudents().then(data => { populateStudents(data); });
+
+			window.setMVRPLink = function(name) {
+				localStorage.setItem('name', name);
+				window.open('single-mvrp.html', '_self');
+			};
 
 			const studentsDiv = document.getElementById('students');
 			function populateStudents(data) {
